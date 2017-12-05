@@ -14,13 +14,13 @@
 
 namespace RB{
 
-    template <typename K, typename V, class Compare=std::less<K> >
+    template <typename K, typename ...V, class Compare=std::less<K> >
     class RBTree{
 
         using key = K;
         using val = V;
         using comp = Compare;
-        using value_type = std::pair<K,V>;
+        using value_type = std::tuple<K,V>;
 
         class RBNode{
 
@@ -31,7 +31,7 @@ namespace RB{
             friend class RBTree;
             friend class iterator;
 
-            std::pair<key,val> __kv;
+            std::tuple<key,V> __kv;
 
             enum class Color{
                 red,black
@@ -92,7 +92,7 @@ namespace RB{
             }
 
             friend bool operator<(const RBNode &f, const RBNode &s){
-                return comp()(f.__kv.first,s.__kv.first);
+                return comp()(std::get<0>(f.__kv),std::get<0>(s.__kv));
             }
         };
 
@@ -253,7 +253,7 @@ namespace RB{
                     break;
                 }
 
-                if (cmp((r->__kv).first, key)) {
+                if (cmp(std::get<0>(r->__kv), key)) {
                     r = r->__left;
                 } else {
                     r = r->__right;
@@ -263,8 +263,58 @@ namespace RB{
             return r;
         }
 
-        void fixAfterDelete(RBPtr toFix){
+        template <typename F,typename R>
+        void fixWithSibling(RBPtr &toFix,RBPtr &p,F getLeft, F getRight,R RLeft, R RRight){
 
+            RBPtr sibling = getRight(p);
+
+            if(sibling->__color == RBNode::Color::red){
+                sibling->__color = RBNode::Color::black;
+                RLeft(p);
+                sibling = getRight(p);
+            }
+
+            if(getLeft(sibling)->__color == RBNode::Color::black &&
+               getRight(sibling)->__color == RBNode::Color::black){
+                sibling->__color = RBNode::Color::red;
+                toFix = p;
+            }
+            else if(getRight(sibling)->__color == RBNode::Color::black){
+                getLeft(sibling)->__color = RBNode::Color::black;
+                sibling->__color = RBNode::Color::red;
+                RRight(sibling);
+                sibling = getRight(p);
+            }
+
+            sibling->__color = p->__color;
+            p->__color = RBNode::Color::black;
+            getRight(sibling)->__color = RBNode::Color::black;
+            RLeft(p);
+            toFix = root;
+        }
+
+
+        void fixAfterDelete(RBPtr toFix){
+            while(toFix != root &&
+                    toFix->__color == RBNode::Color::black) {
+
+                RBPtr p = getParent(toFix);
+
+                if (toFix == p->__left) {
+                    fixWithSibling(toFix, p, [](RBPtr n) -> RBPtr { return n->__left; },
+                                   [](RBPtr n) -> RBPtr { return n->__right; },
+                                   [](RBPtr n) { rotateLeft(n); },
+                                   [](RBPtr n) { rotateRight(n); });
+
+                } else {
+                    fixWithSibling(toFix, p, [](RBPtr n) -> RBPtr { return n->__right; },
+                                   [](RBPtr n) -> RBPtr { return n->__left; },
+                                   [](RBPtr n) { rotateRight(n);},
+                                   [](RBPtr n) { rotateLeft(n);});
+                }
+            }
+
+            toFix->__color = RBNode::Color ::black;
         }
 
         void erase(RBPtr toErase){
@@ -308,7 +358,6 @@ namespace RB{
                 fixAfterDelete(x);
             }
         }
-
 
     public:
 
@@ -408,7 +457,7 @@ namespace RB{
                             break;
                         }
 
-                        if(node == p->left){
+                        if(node == p->__left){
                             node = p;
                             break;
                         }
@@ -429,8 +478,9 @@ namespace RB{
         RBTree(const RBTree &other):
                 root(other.root){}
 
-        RBTree(RBTree &&other):
-                root(move(other)){}
+        RBTree(RBTree &&other){
+            swap(root,other.root);
+        }
 
         iterator begin(){
             RBPtr left = getleftMost(root);
@@ -451,7 +501,7 @@ namespace RB{
                 RBPtr temp = root;
 
                 while(temp){
-                    if(cmp(k,(temp->__kv).first)){
+                    if(cmp(k,std::get<0>(temp->__kv))){
                         if(temp->__left){
                             temp = temp->__left;
                         }
@@ -495,8 +545,6 @@ namespace RB{
         iterator find(const key &k){
             return iterator(find(root,k));
         }
-
-
     };
 };
 #endif
