@@ -14,13 +14,13 @@
 
 namespace RB{
 
-    template <typename K, typename ...V, class Compare=std::less<K> >
+    template <typename K, class Compare,typename ...V>
     class RBTree{
 
         using key = K;
-        using val = V;
+       // using val = V;
         using comp = Compare;
-        using value_type = std::tuple<K,V>;
+        using value_type = std::tuple<K,V...>;
 
         class RBNode{
 
@@ -31,7 +31,7 @@ namespace RB{
             friend class RBTree;
             friend class iterator;
 
-            std::tuple<key,V> __kv;
+            std::tuple<key,V...> __kv;
 
             enum class Color{
                 red,black
@@ -45,8 +45,8 @@ namespace RB{
 
             RBNode():__color(Color::red){}
 
-            RBNode(const key& k, const val& v):
-                    __kv({k,v}),
+            RBNode(const key& k, V... v):
+                    __kv(std::tuple_cat(std::tuple<key>(k),std::tuple<V...>(v...))),
                     __color(Color::red) {
             }
 
@@ -302,15 +302,15 @@ namespace RB{
 
                 if (toFix == p->__left) {
                     fixWithSibling(toFix, p, [](RBPtr n) -> RBPtr { return n->__left; },
-                                   [](RBPtr n) -> RBPtr { return n->__right; },
-                                   [](RBPtr n) { rotateLeft(n); },
-                                   [](RBPtr n) { rotateRight(n); });
+                                   [&](RBPtr n) -> RBPtr { return n->__right; },
+                                   [&](RBPtr n) { rotateLeft(n); },
+                                   [&](RBPtr n) { rotateRight(n); });
 
                 } else {
                     fixWithSibling(toFix, p, [](RBPtr n) -> RBPtr { return n->__right; },
-                                   [](RBPtr n) -> RBPtr { return n->__left; },
-                                   [](RBPtr n) { rotateRight(n);},
-                                   [](RBPtr n) { rotateLeft(n);});
+                                   [&](RBPtr n) -> RBPtr { return n->__left; },
+                                   [&](RBPtr n) { rotateRight(n);},
+                                   [&](RBPtr n) { rotateLeft(n);});
                 }
             }
 
@@ -491,9 +491,9 @@ namespace RB{
             return iterator(nullptr);
         }
 
-        void insert(const key& k, const val& v){
+        void insert(const key& k, V... v){
             if(!root){
-                root = std::make_shared<RBNode>(k,v);
+                root = std::make_shared<RBNode>(k,v...);
                 root->__color = RBNode::Color::black;
             }
             else{
@@ -506,7 +506,7 @@ namespace RB{
                             temp = temp->__left;
                         }
                         else{
-                            temp->__left = std::make_shared<RBNode>(k,v);
+                            temp->__left = std::make_shared<RBNode>(k,v...);
                             temp->__left->__parent = temp;
                             temp = temp->__left;
                             break;
@@ -517,7 +517,7 @@ namespace RB{
                             temp = temp->__right;
                         }
                         else{
-                            temp->__right = std::make_shared<RBNode>(k,v);
+                            temp->__right = std::make_shared<RBNode>(k,v...);
                             temp->__right->__parent = temp;
                             temp = temp->__right;
                             break;
